@@ -79,7 +79,7 @@ public class BGA
 
     public output_struct output;
 
-    public void StartBGA(ref AudioClip audioClip, bga_settings settings, song_meta_struct song, string songFilePath)
+    public void StartBGA(ref AudioClip audioClip, ref WebInfo webInfo, bga_settings settings, song_meta_struct song, string songFilePath)
     {
         this.songFilePath = songFilePath;
         this.song_meta = song;
@@ -104,7 +104,8 @@ public class BGA
         song_info.samples = new float[song_info.sampleCount * song_info.channels];
         song_info.sampleLength = song_info.length / (float)song_info.sampleCount;
         //GetData returns samples for both the L(eft) and R(ight) channels
-        audioClip.GetData(song_info.samples, 0);
+        //audioClip.GetData(song_info.samples, 0);
+        song_info.samples = webInfo.samples;
 
         output = new output_struct();
 
@@ -112,8 +113,11 @@ public class BGA
 
         //Create the background thread and run the BGA algorithim
         //The algorthim will have access to all the public structs
-        Thread BGAThread = new Thread(new ThreadStart(algorithimWrapper));
-        BGAThread.Start();
+        Debug.Log("make thread");
+        //Thread BGAThread = new Thread(new ThreadStart(algorithimWrapper));
+        //BGAThread.Start();
+        // crash the ui thread #yolo
+        algorithimWrapper();
 
     }
 
@@ -160,11 +164,17 @@ public class BGA
         }
     }
 
+    // float[] getCombinedSamplesWeb (ref float[] samples) {
+    // }
+
     //The B(eat) G(enerating) A(lgorithim)
     //Background thread to create the beatmap
     void algorithim ()
     {
-        float[] samples = getCombinedSamples(ref song_info.samples, song_info.sampleCount, song_info.channels);
+        Debug.Log("algo");
+        //float[] samples = //getCombinedSamples(ref song_info.samples, song_info.sampleCount, song_info.channels);
+
+        float[] samples = song_info.samples;
 
         Debug.Log("Song samples coverted to mono");
 
@@ -183,6 +193,8 @@ public class BGA
         FFTProvider fftProvider = new DSPLibFFTProvider(settings.n_bins);
         WINDOW_TYPE fftWindow = WINDOW_TYPE.Hamming;
 
+        Debug.Log("done allocating large amount of ram");
+
         //perform fft using N_BINS at a time
         for (int i = 0; i < finalArraySize; i++)
         {
@@ -194,6 +206,7 @@ public class BGA
                 currSamples[j - startIndex] = samples[j];
             }
 
+            Debug.Log("doFFT");
             output.fftData[i] = fftProvider.doFFT(currSamples, fftWindow);
 
             if (i != 0)

@@ -108,6 +108,8 @@ public static class BGACommon
     public const float TIME_AFTER_FLY_SECTION = 5f; //We need to fall back to the track so do not spawn anything until we fall back
     public const Char DELIMITER = '~';
     public const bool IS_PC = false; // debug
-    public const string SONG_FORMAT = (IS_PC ? ".ogg" : ".mp3");
-    public const AudioType AUDIO_TYPE = (IS_PC ? AudioType.OGGVORBIS : AudioType.MPEG);
+    //public const string SONG_FORMAT = (IS_PC ? ".ogg" : ".mp3");
+    public const string SONG_FORMAT = ".wav";
+    public const AudioType AUDIO_TYPE = AudioType.WAV;
+    //public const AudioType AUDIO_TYPE = (IS_PC ? AudioType.OGGVORBIS : AudioType.MPEG);
 }

@@ -7,11 +7,15 @@ using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine.SceneManagement;
 using System.Linq;
 using UnityEngine.Networking;
+using System.Runtime.InteropServices;
 
 
 
 public class MainMenuCanvasController : MonoBehaviour
 {
+    [DllImport("__Internal")]
+    private static extern void SongUploaderInit();
+
     //Button playButton;
     private bool updated = false; // prevents constant updating of the buttons, etc.
     //Vector3 comparisonVector3;
@@ -69,6 +73,7 @@ public class MainMenuCanvasController : MonoBehaviour
     //For BGA
     public BGA bga;
     public AudioClip inputAudioClip; //To be loaded from web url or file url
+    public WebInfo webInfo;
 
     #if !UNITY_ANDROID
     #endif
@@ -112,6 +117,7 @@ public class MainMenuCanvasController : MonoBehaviour
     int currentState = 2;
     void Start()
     {
+        SongUploaderInit();
         bga = new BGA();
         mapsContent = GameObject.Find("MapsContent");
         currentCarIndex = MainMenuController.player.currentCarID;
@@ -363,7 +369,7 @@ public class MainMenuCanvasController : MonoBehaviour
                     } else {
                         settings = new bga_settings(1024, 0.3f, 1.5f, 30f, 30f, 1f, 25f, 0.5f, 5f, currentSeed);
                     }
-                    bga.StartBGA(ref inputAudioClip, settings, song, path);
+                    bga.StartBGA(ref inputAudioClip, ref webInfo, settings, song, path);
                 }
                 if(state == STATE.BGA_STARTED){
                     //animation for loading
@@ -518,65 +524,88 @@ public class MainMenuCanvasController : MonoBehaviour
       ######## BGA STUFF ########
       ###########################*/
 
-    #if UNITY_ANDROID
-
     void selectFileListener()
     {
-
-        if (BGACommon.IS_PC) {
-            //for testing
-            resultFromJava("Dreams~Lost Sky~Dreams");
-        }
-        else {
-            Debug.Log("Opening select file on android...");
-            //https://docs.unity3d.com/ScriptReference/AndroidJavaRunnable.html
-            AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-            AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
-            string filePath = Application.persistentDataPath + "/Songs";
-            Debug.Log(filePath);
-            if (!Directory.Exists(filePath)) {
-                Directory.CreateDirectory(filePath);
-            }
-            //path = "file://" + filePath;
-            activity.Call("CallFromUnity", filePath);
-        }
+        //todo
     }
 
-    void resultFromJava(string s) 
+    //Javascript response
+    void WebFileSelected(string url) 
     {
-      Debug.Log("Got a result from java");
-      Debug.Log(s);
-      if (string.Equals(s, "bgaerror")) {
-          Debug.Log("err");
-          return; //Chances are user did not pick a song so we just silently fail
-      }
-      string[] strings = s.Split(new char[] {BGACommon.DELIMITER});
-      song = new song_meta_struct(strings[0], strings[1], strings[2]);
-      songNameText.text = song.title + " by " + song.artist;
-      path = Application.persistentDataPath + "/Songs/" + s;
-
-      //start loading song
-      state = STATE.AUDIO_CLIP_LOADING;
-      StartCoroutine(getAudioClipFromPath(path + BGACommon.SONG_FORMAT));
+        //url is a blob that we can do IO on
+        //todo some way to parse song meta
+        song = new song_meta_struct("web", "web", "web");
+        songNameText.text = song.title + " by " + song.artist;
+        path = url;
+        state = STATE.AUDIO_CLIP_LOADING;
+        
     }
 
-    #else
-
-    void selectFileListener()
+    //url contains sample data about the song since we can't get that from WebGL
+    void WebFileProcessed(string url)
     {
-
+        StartCoroutine(getAudioClipFromPath(path, url));
     }
 
-    #endif
+    // #if UNITY_ANDROID
 
-    IEnumerator getAudioClipFromPath(string path)
+    // void selectFileListener()
+    // {
+
+        // if (BGACommon.IS_PC) {
+        //     //for testing
+        //     resultFromJava("Dreams~Lost Sky~Dreams");
+        // }
+        // else {
+        //     Debug.Log("Opening select file on android...");
+        //     //https://docs.unity3d.com/ScriptReference/AndroidJavaRunnable.html
+        //     AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+        //     AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
+        //     string filePath = Application.persistentDataPath + "/Songs";
+        //     Debug.Log(filePath);
+        //     if (!Directory.Exists(filePath)) {
+        //         Directory.CreateDirectory(filePath);
+        //     }
+        //     //path = "file://" + filePath;
+        //     activity.Call("CallFromUnity", filePath);
+        // }
+   // }
+
+    // void resultFromJava(string s) 
+    // {
+    //   Debug.Log("Got a result from java");
+    //   Debug.Log(s);
+    //   if (string.Equals(s, "bgaerror")) {
+    //       Debug.Log("err");
+    //       return; //Chances are user did not pick a song so we just silently fail
+    //   }
+    //   string[] strings = s.Split(new char[] {BGACommon.DELIMITER});
+    //   song = new song_meta_struct(strings[0], strings[1], strings[2]);
+    //   songNameText.text = song.title + " by " + song.artist;
+    //   path = Application.persistentDataPath + "/Songs/" + s;
+
+    //   //start loading song
+    //   state = STATE.AUDIO_CLIP_LOADING;
+    //   StartCoroutine(getAudioClipFromPath(path + BGACommon.SONG_FORMAT));
+    // }
+
+    // #else
+
+    // void selectFileListener()
+    // {
+
+    // }
+
+    // #endif
+
+    IEnumerator getAudioClipFromPath(string path, string dataUrl)
     {
         //see https://docs.unity3d.com/ScriptReference/Networking.UnityWebRequestMultimedia.GetAudioClip.html
 
         Debug.Log(BGACommon.AUDIO_TYPE);
         Debug.Log(BGACommon.SONG_FORMAT);
 
-        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip("file://" + path, BGACommon.AUDIO_TYPE))
+        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(path, BGACommon.AUDIO_TYPE))
         {
             yield return www.Send();
 
@@ -590,6 +619,24 @@ public class MainMenuCanvasController : MonoBehaviour
             {
                 inputAudioClip = DownloadHandlerAudioClip.GetContent(www);
                 Debug.Log("Loaded");
+                //state = STATE.AUDIO_CLIP_LOADED;
+            }
+        }
+        if (state == STATE.AUDIO_CLIP_ERROR) {
+            yield break;
+        }
+        using (UnityWebRequest www = UnityWebRequest.Get(dataUrl))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.isNetworkError)
+            {
+                Debug.Log("err");
+                Debug.Log(www.error);
+                state = STATE.AUDIO_CLIP_ERROR;
+            }
+            else {
+                webInfo = WebInfo.CreateFromJSON(www.downloadHandler.text);
                 state = STATE.AUDIO_CLIP_LOADED;
             }
         }
